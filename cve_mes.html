@@ -1,0 +1,40 @@
+from datetime import datetime, timedelta
+
+# Función para convertir una cvemes en formato YYYYMM a un objeto datetime
+def cvemes_to_datetime(cvemes):
+    return datetime.strptime(cvemes, "%Y%m")
+
+# Función para incrementar el mes en una fecha
+def increment_month(dt):
+    # Incrementar el año si es diciembre
+    if dt.month == 12:
+        return dt.replace(year=dt.year + 1, month=1)
+    else:
+        return dt.replace(month=dt.month + 1)
+
+# Función para generar las claves de mes intermedias
+def generar_cvemes_intermedias(init_cvemes, end_cvemes):
+    # Convertir las claves de mes a objetos datetime
+    init_date = cvemes_to_datetime(init_cvemes)
+    end_date = cvemes_to_datetime(end_cvemes)
+    
+    # Lista para almacenar las claves de mes intermedias
+    cvemes_list = [init_cvemes]
+    
+    # Bucle para generar e incluir las claves de mes intermedias
+    current_date = increment_month(init_date)
+    while current_date <= end_date:
+        # Convertir la fecha actual a cvemes y agregarla a la lista
+        cvemes_list.append(current_date.strftime("%Y%m"))
+        # Incrementar el mes
+        current_date = increment_month(current_date)
+    
+    return cvemes_list
+
+# Ejemplo de uso
+INIT_CVE_MES = "202301"
+END_CVE_MES = "202305"
+
+# Generar las cvemes intermedias
+cvemes_intermedias = generar_cvemes_intermedias(INIT_CVE_MES, END_CVE_MES)
+cvemes_intermedias
