@@ -1,0 +1,258 @@
+import pandas as pd
+from sqlalchemy import or_, and_
+import random
+import numpy as np
+import ast
+
+data = pd.read_csv("estado_municipio_cps_latin1.csv", encoding="latin-1")
+def obtener_codigo_postal(estado, municipio):
+    fila = data[(data['Estado'] == estado) & (data['Municipio'] == municipio)]
+    if not fila.empty:
+        cps = str(fila['CPs'].values[0]).replace('[', '').replace(']', '').split(',')
+        return cps[0].strip()  # Devuelve el primer código postal
+    return None
+
+def obtener_conjunto_codigo_postal(estado,municipio):
+    fila = data[(data['Estado'] == estado) & (data['Municipio'] == municipio)]
+    if not fila.empty:
+        cps = str(fila['CPs'].values[0]).replace('[', '').replace(']', '').split(',')
+        return cps # Devuelve el primer código postal
+    return None
+######################################################################################################
+############ apartado de logica de asignacion cualuqier overdrive a las reglas debe ser colocado aqui en el cao laboral o mercantil
+def logica_de_asignacion(Directorio,Litigio,nombre_actor, hsbcnet, fcvp, tier, atento_atencion,perimeter, municipio, codigo_postal_litigio, suerte, tipo_litigio,excel_file,Estado):
+    #print(tipo_litigio)
+    # obtener infromación de todos los despachos
+    comentario=''
+    despachos=Directorio.query.filter(Directorio.tipo_asunto==tipo_litigio).all() #
+    # switches de prioridad para cambios de prioridad a nivel despacho
+    switch_doble_prioridad=False
+    switch_mitad_prioridad=False
+    #print("inicio")
+    # asiganciones anteriores a la app
+    historial_asignaciones = pd.read_csv(excel_file, encoding="latin-1")
+    # Para una cadena (string) en Python
+    # ponemos en mayusculas y quitamos espacios compuestos or mas de un espacio
+    nombre_actor_normalizado = nombre_actor.strip().upper()
+    # Para una Serie de Pandas
+    historial_asignaciones['ACTOR'] = historial_asignaciones['ACTOR'].str.strip().str.upper()
+
+    #FILTRO 1: VER SI ESTÁ LA BASE EN EL EXCEL Y ASIGNAR SI Y SÓLO SI ESTÁ EN EL DIRECTORIO ACTIVO
+    # Verificación y lógica de asignación
+    if nombre_actor_normalizado in historial_asignaciones['ACTOR'].values:
+        despacho_excel = historial_asignaciones.query('ACTOR== @nombre_actor_normalizado')['ABOGADO PATRONO'].iloc[0]
+        for despacho_ in despachos:
+            #print("despacho: ", despacho_.nombre)
+            # verifico que el despacho aun este en el directorio
+            if despacho_excel == despacho_.nombre: #and despacho_.tipo_asunto ==  historial_asignaciones.query('ACTOR== @nombre_actor_normalizado')['ABOGADO PATRONO']:
+                #print("asignación directa por historial previo")
+                comentario=despacho_excel+" asignación directa por historial previo"
+                return despacho_,comentario
+    # FILTRO 1 VER SI ESTA EN EL DIRECTORIO DE LITIGIOS NO HISTORICOS FUERA DEL EXCEL
+
+    litigio_existente=Litigio.query.filter(and_(Litigio.nombre_actor==nombre_actor_normalizado, Litigio.tipo_litigio==tipo_litigio ) ).first() # toma el último litigio
+    # ver si litigio_existente es no vacio
+    if litigio_existente:
+        #print(litigio_existente.status.value)
+        if litigio_existente.status.value !='borrado':
+            despacho_asignado_previamente=litigio_existente.despacho
+            #print("asignación directa por historial previo")
+            comentario=despacho_asignado_previamente.nombre + " asignación directa por historial previo"
+            return despacho_asignado_previamente,comentario
+   #FILTROS ASIGNADOS A MERCANTIL
+    if tipo_litigio=="Mercantil" or tipo_litigio=="Ambos":
+        despachos=Directorio.query.filter(and_(Directorio.tipo_asunto=="Mercantil",Directorio.plaza_demanda==Estado))
+        #print("mercantil")
+        asignacion_directa=""
+        despacho_doble_prioridad=""
+        # FILTRO 1: ASIGNACIÓN  HSBCNET
+        #SWICHES DE CAMBIO DE PRIORIDAD
+        #inicio de filtros
+        if hsbcnet==True:
+            #print("hsbcnet")
+            comentario='Regla especial hsbcnet'
+            volado_institucional= np.random.random() # una variables uniforme intervalo [0,1]
+            if volado_institucional<=0.5:
+                asignacion_directa="MAÑON QUINTANA ABOGADOS SC"
+            elif volado_institucional>0.5:
+                asignacion_directa="MEDINA Y ROJAS ABOGADOS SC"
+            #print("resultado_volado",asignacion_directa)
+    
+    # reduccion prioridad hoyos para litigios fpv
+        if  fcvp==True: #and despacho_.nombre==despacho_mitad_prioridad and:
+            # se suman 100000 para que jueguen los despchos en ruleta 
+            suerte=suerte+100000
+            despacho_mitad_prioridad="DE HOYOS Y AVILES SC"
+            switch_mitad_prioridad=True
+        # ASIGNACIÓN ESPECIAL A JURIDICO DE HARO GONZALES
+        if suerte>=300000 and tier==3:
+            #print('Asiganacion especial haro')
+            despacho_doble_prioridad="CONSORCIO JURIDICO DE HARO GONZALEZ, SC"
+            switch_doble_prioridad=True
+            
+        for despacho_ in despachos:
+            comentario=asignacion_directa+" "+comentario
+            if asignacion_directa==despacho_.nombre:
+                
+                #print('asigancion_directa_hsbcnet completada')
+                return(despacho_,comentario)
+        #FILTRO 5: SÓLO TOMAR DESPACHOS QUE ATIENDAN SUERTE IGUALES O MAYORES EN DIRECTORIO Y LITIGIO Y SÓLO AQUELLOS CON EL TIER CORRESPONDIENTE
+        #busca despashcos a nivel localidad
+        despachos=Directorio.query.filter(and_(Directorio.suerte<=int(suerte),Directorio.tier==int(tier),Directorio.plaza_demanda==Estado,Directorio.localidad==municipio ,
+                                               or_(Directorio.tipo_asunto=="Mercantil", Directorio.tipo_asunto=="Ambos"),Directorio.asignable==True) ).all() #
+        ##########
+        # Aquí comienza el ajuste específico para MAÑON QUINTANA ABOGADOS SC
+        if not despachos and suerte < 100000:
+            # Busca específicamente si MAÑON QUINTANA ABOGADOS SC está disponible en la localidad y para casos de mayor suerte
+            despacho_mañon = Directorio.query.filter(and_(
+                Directorio.nombre == "MAÑON QUINTANA ABOGADOS SC",
+                Directorio.plaza_demanda == Estado,
+                Directorio.localidad == municipio,
+                Directorio.suerte > 100000  # Originalmente disponible para casos de mayor suerte
+            )).first()
+
+            if despacho_mañon:
+                # Se ajusta la suerte de MAÑON QUINTANA ABOGADOS SC para que pueda asignarse a este caso
+                suerte_ajustada = 50000  # Nueva suerte ajustada para la búsqueda
+                despachos = [despacho_mañon]  # Considera ahora a MAÑON QUINTANA ABOGADOS SC como disponible para asignación
+                comentario += " | Suerte de MAÑON QUINTANA ABOGADOS SC ajustada a 50,000 debido a falta de despachos disponibles en la localidad."
+        ##########
+        #print("despachos:",despachos)
+        if despachos:
+            despachos=despachos
+            #print("con cobertura")
+        else:
+            #print("sin cobertura")
+            comentario="sin cobertura se usaron despachos cercanos en el estado"
+            despachos=Directorio.query.filter(and_(Directorio.suerte<=int(suerte),Directorio.tier==int(tier) ,Directorio.plaza_demanda==Estado,or_(Directorio.tipo_asunto=="Mercantil", Directorio.tipo_asunto=="Ambos"),Directorio.asignable==True) ).all() #
+    elif tipo_litigio=='Laboral':
+        #print("laboral")
+        #siganciones especiales
+        despachos=Directorio.query.filter(Directorio.tipo_asunto=="Laboral")
+        #FILTRO 4: ASGINACIÓN DIRECTA A ATENTO ATENCIÓN:
+        #print(atento_atencion)
+        #print(perimeter)
+        if atento_atencion==True:
+        #    print("atento atención")
+            
+            asignacion_directa="MARVAN GONZALEZ GRAF Y GONZALEZ LARRAZOLO SC"
+            comentario=asignacion_directa +' Asignación directa por atento atención'
+            for despacho_ in despachos:
+                if asignacion_directa==despacho_.nombre:
+                    return despacho_,comentario
+        #        print(atento_atencion)
+        if perimeter==True:
+        #    print("Perimeter")
+            perimeter=True
+            comentario='Asiganción directa por perimeter'
+            asignacion_directa="MARVAN GONZALEZ GRAF Y GONZALEZ LARRAZOLO SC"
+            comentario=asignacion_directa + ' Asiganción directa por perimeter'
+            for despacho_ in despachos:
+                if asignacion_directa==despacho_.nombre:
+                    return despacho_,comentario
+        # filtro normal
+        despachos=Directorio.query.filter(and_(Directorio.suerte<=int(suerte),Directorio.tier==int(tier),Directorio.plaza_demanda==Estado,Directorio.localidad==municipio ,or_(Directorio.tipo_asunto=="Laboral", Directorio.tipo_asunto=="Ambos"),Directorio.asignable==True) ).all() #
+        #print("despachos:",despachos)
+        if despachos:
+            despachos=despachos
+            print("con cobertura")
+        else:
+            print("sin cobertura")
+            comentario="sin cobertura se usaron despachos cercanos en el estado"
+            despachos=Directorio.query.filter(and_(Directorio.suerte<=int(suerte),Directorio.tier==int(tier) ,Directorio.plaza_demanda==Estado,or_(Directorio.tipo_asunto=="Laboral", Directorio.tipo_asunto=="Ambos"),Directorio.asignable==True) ).all() #
+
+
+    #FILTRO 6: OBTENER CP DE MUNICIPIO DE DESPACHO, DE LITIGIO Y OBTENER DIFERENCIA 
+    ubicacion_despachos=[]
+    for despacho in despachos:  
+        registro={"ID":despacho.id,"Nombre": despacho.nombre,"Estado":despacho.plaza_demanda, "Prioridad":despacho.prioridad, "Municipio":despacho.localidad.split(",")[0],"Corresponsabilidad":despacho.corresponsabilidad,"Suerte":despacho.suerte,"TIER":despacho.tier }
+        ubicacion_despachos.append(registro)
+    df_ubicacion_despachos=pd.DataFrame(ubicacion_despachos)
+
+    merge_cp=df_ubicacion_despachos.merge(data,on=["Estado","Municipio"],how="inner")
+    merge_cp['CPs']=merge_cp['CPs'].apply(lambda x: ast.literal_eval(x))
+    filtro_cp=merge_cp.to_dict()
+
+
+    filtro_cp['MenorValor'] = {}
+    for key, value in filtro_cp['CPs'].items():
+        filtro_cp['CPs'][key] =np.absolute(np.array(value)-int(codigo_postal_litigio))
+        filtro_cp['MenorValor'][key] = np.min(filtro_cp['CPs'][key])
+    
+    # Obtener los valores de "Estado", "Municipio" y "MenorValor" como listas
+    id=list(filtro_cp['ID'].values())
+    nombre=list(filtro_cp['Nombre'].values())
+    estados = list(filtro_cp['Estado'].values())
+    prioridad=list(filtro_cp['Prioridad'].values())
+    municipios = list(filtro_cp['Municipio'].values())
+    corresponsabilidades=list(filtro_cp['Corresponsabilidad'].values())
+    menores_valores = list(filtro_cp['MenorValor'].values())
+
+    # FILTRO 7: ORDENAR DE MENOR A MAYOR LA DISTANCIA DE LOS CP MAS CERCANOS
+    df_minimo = pd.DataFrame({'ID': id, 'Nombre': nombre, 'Estado': estados, 'Prioridad': prioridad, 'Municipio': municipios, 'Corresponsabilidad': corresponsabilidades, 'MenorValor': menores_valores})
+    df_ordenado = df_minimo.sort_values(by='Municipio')#.drop_duplicates(subset=['Nombre','Estado'], keep='first')
+    #print("df_ordendo antes de estados")
+    #print(df_ordenado)
+    # FILTRO 8: filtrar por estado
+    df_ordenado=df_ordenado.query(f"Estado=='{Estado}'").drop_duplicates(subset=['Nombre','Estado'], keep='first')
+    #print("df_ordendo después de estados")
+    #print(Estado)
+    #print(df_ordenado)
+    # OBTENER LOS 5 PRIMEROS
+    minimo_rows = min(5, len(df_ordenado))
+    df_diferencia_cp = df_ordenado.head(minimo_rows)
+
+    # FILTRO DE CORRESPONSABILIDAD (aplicado después de seleccionar los 5 primeros)
+    df_diferencia_cp = df_diferencia_cp.query('Corresponsabilidad == False')
+    if df_diferencia_cp.empty:
+        df_diferencia_cp = df_ordenado.head(minimo_rows)
+
+ #pasar aqui filtro de corresponsalía
+
+    #Modificacion condicionada de las prioridades
+    
+    if switch_doble_prioridad==True:
+        #print("Valor anterior a la modificacion manual: ", df_diferencia_cp.query('Nombre==@despacho_doble_prioridad')['Prioridad'].iloc[0])
+        try:
+            if df_diferencia_cp.query('Nombre==@despacho_doble_prioridad')['Prioridad'].iloc[0]<4:
+                df_diferencia_cp.loc[df_diferencia_cp['Nombre'] == despacho_doble_prioridad, 'Prioridad'] += 1
+        except IndexError:
+                pass
+    #print("Modificacion posterior: ", df_diferencia_cp.query('Nombre==@despacho_doble_prioridad')['Prioridad'].iloc[0])
+    if switch_mitad_prioridad==True:
+        #print("mitad prioridad")
+        #print(df_diferencia_cp.query('Nombre==@despacho_mitad_prioridad'))
+        try:
+            if df_diferencia_cp.query('Nombre==@despacho_mitad_prioridad')['Prioridad'].iloc[0]>0:
+                df_diferencia_cp.loc[df_diferencia_cp['Nombre'] == despacho_mitad_prioridad, 'Prioridad'] /= 2
+        except IndexError:
+                pass
+        #print(despacho_mitad_prioridad, ' : ',df_diferencia_cp.loc[df_diferencia_cp['Nombre'] == despacho_mitad_prioridad, 'Prioridad'])
+
+    #FILTRO 8: VER PRIORIDAD Y ASIGNAR DE ACUERDO A LA PROBABILIDAD DE PRIORIDAD DE CADA DESPACHO
+    prioridades = df_diferencia_cp['Prioridad']
+
+    probabilidades =(prioridades / np.sum(prioridades))
+    # Seleccionar aleatoriamente un elemento considerando la ponderación de sus prioridades
+    print(df_diferencia_cp)
+    elemento_seleccionado = np.random.choice(df_diferencia_cp.to_records(), p=probabilidades)
+
+    # Imprimir el DataFrame resultante
+    #print(df_diferencia_cp[[ 'ID','Nombre','Estado','MenorValor']])
+    # Mostrar el elemento seleccionado
+    despacho_seleccionado=elemento_seleccionado[2]
+    #print("despacho seleccionado: ",despacho_seleccionado)
+
+    despacho_objeto=Directorio.query.filter(Directorio.nombre==despacho_seleccionado).first()
+
+    if not isinstance(despacho_seleccionado,str):
+        return None
+    else:
+        comentario=despacho_objeto.nombre
+        return despacho_objeto,comentario
+
+
+    
+
+
+ 
