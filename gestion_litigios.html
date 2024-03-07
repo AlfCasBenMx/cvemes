@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Gestión de Despachos</title>
+</head>
+
+<body>
+    <div class="modal" id="editModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h4 class="modal-title">Editar Despacho</h4>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Campo para editar 'asignable' -->
+                    <div class="form-group">
+                        <label for="toggleEditViaticos">Editar Viáticos:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditViaticos">
+                            <span class="slider round"></span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="editViaticos" name="viaticos" disabled>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toggleEditTier">Editar Tier:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditTier">
+                            <span class="slider round"></span>
+                        </label>
+                        <input type="number" id="editTier" name="tier" min="1" max="3" disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toggleEditSuerte">Editar Suerte:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditSuerte">
+                            <span class="slider round"></span>
+                        </label>
+                        <input type="text" id="editSuerte" name="suerte" disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toggleEditCorresponsabilidad">Editar Corresponsabilidad:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditCorresponsabilidad">
+                            <span class="slider round"></span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="editCorresponsabilidad" name="corresponsabilidad" disabled>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toggleEditPrioridad">Editar Prioridad:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditPrioridad">
+                            <span class="slider round"></span>
+                        </label>
+                        <input type="number" id="editPrioridad" name="prioridad" min="1" max="4" disabled>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="toggleEditAsignable">Editar Asignable:</label>
+                        <label class="switch">
+                            <input type="checkbox" id="toggleEditAsignable">
+                            <span class="slider round"></span>
+                        </label>
+                        <label class="switch">
+                            <input type="checkbox" id="editAsignable" name="asignable" disabled>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-success" id="saveChanges">Guardar Cambios</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container">
+        <h2 class="my-4">Gestión de Despachos</h2>
+        {% for message in get_flashed_messages() %}
+        <div class="alert alert-info">{{ message }}</div>
+        {% endfor %}
+
+
+        <form method="post" action="{{ url_for('gestion_despachos') }}" id="filterForm">
+            <div class="row">
+                <!-- Columna 1 -->
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="searchName">Filtrar por Nombre de Despacho:</label>
+                        <select class="form-control select2-multiple" id="searchName" name="searchName[]"
+                            multiple="multiple">
+                            {% for name in unique_names %}
+                            <option value="{{ name[0] }}">{{ name[0] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="searchPlaza">Filtrar por Plaza de Demanda:</label>
+                        <select class="form-control select2-multiple" id="searchPlaza" name="searchPlaza[]"
+                            multiple="multiple">
+                            <option value="all">Todos los Estados</option>
+                            {% for state in unique_states %}
+                            <option value="{{ state[0] }}">{{ state[0] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchLocalidad">Filtrar por Localidad:</label>
+                        <select class="form-control select2-multiple" id="searchLocalidad" name="searchLocalidad[]"
+                            multiple="multiple">
+                            <option value="all">Todos las localidades</option>
+                            {% for localidad in unique_loc %}
+                            <option value="{{ localidad[0] }}">{{ localidad[0] }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Columna 2 -->
+                <div class="col-md-6">
+                    <div class="form-group">
+                        <label for="searchTier">Filtrar por Tier:</label>
+                        <select class="form-control" id="searchTier" name="searchTier">
+                            <option value="">Todos</option>
+                            <option value="1">1</option>
+                            <option value="2">2</option>
+                            <option value="3">3</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchType">Filtrar por Tipo:</label>
+                        <select class="form-control" id="searchType" name="searchType">
+                            <option value="">Todos</option>
+                            <option value="Mercantil">Mercantil</option>
+                            <option value="Laboral">Laboral</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="searchSuerte">Filtrar por Suerte (mayor o igual a):</label>
+                        <input type="number" class="form-control" id="searchSuerte" name="searchSuerte" min="0">
+                        <label for="searchSuertemenor">Filtrar por Suerte (menor o igual a):</label>
+                        <input type="number" class="form-control" id="searchSuertemenor" name="searchSuertemenor"
+                            min="0">
+
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" name="filter_button" class="btn btn-primary">Aplica filtros</button>
+        </form>
+        <br>
+        <br>
+        <!-- Botón para eliminar registros seleccionados -->
+        <!-- Botón para editar registros seleccionados -->
+        <button type="button" id="bulkEditSelected" class="btn btn-primary">Edita selección</button>
+
+        <button type="button" id="deleteSelected" class="btn btn-danger">Eliminar Seleccionados</button>
+        <br>
+        <br>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th><input type="checkbox" id="selectAll"></th>
+                    <th>ID</th>
+                    <th>Información del Despacho</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for directorio in directorios %}
+                <tr>
+                    <td><input type="checkbox" class="recordCheckbox" value="{{ directorio.id }}"></td>
+                    <td>{{ directorio.id }}</td>
+                    <td>
+                        <strong>Nombre:</strong> {{ directorio.nombre }}<br>
+                        <strong>Plaza de Demanda:</strong> {{ directorio.plaza_demanda }}<br>
+                        <strong>Localidad:</strong> {{ directorio.localidad }}<br>
+                        <strong>Viáticos:</strong> {{ 'Sí' if directorio.viaticos else 'No' }}<br>
+                        <strong>Tipo de Asunto:</strong> {{ directorio.tipo_asunto }}<br>
+                        <strong>Tier:</strong> {{ directorio.tier }}<br>
+                        <strong>Suerte:</strong> {{ directorio.suerte }}<br>
+                        <strong>Corresponsabilidad:</strong> {{ 'Sí' if directorio.corresponsabilidad else 'No' }}<br>
+                        <strong>Prioridad:</strong> {{ directorio.prioridad }}<br>
+                        <strong>Asignable:</strong> {{ 'Sí' if directorio.asignable else 'No' }}<br>
+                        <!-- <strong>Código Postal:</strong> {{ directorio.codigo_postal }}<br>-->
+                        <strong>Fecha:</strong> {{ directorio.fecha.strftime('%Y-%m-%d %H:%M') }}
+                    </td>
+                    <td>
+                        <!-- Botón para abrir el formulario de edición -->
+                        <button type="button" class="btn btn-primary editButton"
+                            data-id="{{ directorio.id }}">Editar</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+
+        <!-- Campo oculto para almacenar los IDs seleccionados -->
+        <input type="hidden" id="selectedIds" name="selectedIds" value="">
+    </div>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        $(document).ready(function () {
+            $('.select2-multiple').select2();
+
+            $('#filterForm').on('submit', function () {
+                localStorage.setItem('searchName', JSON.stringify($('#searchName').val()));
+                localStorage.setItem('searchPlaza', JSON.stringify($('#searchPlaza').val()));
+                localStorage.setItem('searchLocalidad', JSON.stringify($('#searchLocalidad').val()));
+                localStorage.setItem('searchType', $('#searchType').val());
+
+                localStorage.setItem('searchTier', $('#searchTier').val());
+                localStorage.setItem('searchSuerte', $('#searchSuerte').val());
+                localStorage.setItem('searchSuertemenor', $('#searchSuertemenor').val());
+            });
+            // Restaurar las selecciones de los filtros
+            if (localStorage.getItem('searchName')) {
+                $('#searchName').val(JSON.parse(localStorage.getItem('searchName'))).trigger('change');
+            }
+            if (localStorage.getItem('searchPlaza')) {
+                $('#searchPlaza').val(JSON.parse(localStorage.getItem('searchPlaza'))).trigger('change');
+            }
+            if (localStorage.getItem('searchLocalidad')) {
+                $('#searchLocalidad').val(JSON.parse(localStorage.getItem('searchLocalidad'))).trigger('change');
+            }
+            if (localStorage.getItem('searchTier')) {
+                $('#searchTier').val(localStorage.getItem('searchTier'));
+            }
+            if (localStorage.getItem('searchType')) {
+                $('#searchType').val(localStorage.getItem('searchType'));
+            }
+            if (localStorage.getItem('searchSuerte')) {
+                $('#searchSuerte').val(localStorage.getItem('searchSuerte'));
+            }
+            if (localStorage.getItem('searchSuertemenor')) {
+                $('#searchSuertemenor').val(localStorage.getItem('searchSuertemenor'));
+            }
+
+            // Global variable to store the currently editing dispatch ID
+            var currentEditingId = null;
+
+            // Function to manually show the modal
+            function showModal() {
+                var modal = document.getElementById('editModal');
+                modal.style.display = 'block';
+            }
+
+            // Function to manually hide the modal
+            function hideModal() {
+                var modal = document.getElementById('editModal');
+                modal.style.display = 'none';
+            }
+
+            // Select or deselect all checkboxes
+            $("#selectAll").click(function () {
+                var visibleCheckboxes = $("tbody tr:visible").find(".recordCheckbox");
+                visibleCheckboxes.prop('checked', $(this).prop('checked'));
+            });
+
+            // Delete selected records
+            $("#deleteSelected").click(function () {
+                var selectedIds = $(".recordCheckbox:checked").map(function () {
+                    return $(this).val();
+                }).get();
+
+                if (selectedIds.length === 0) {
+                    alert("Por favor, selecciona al menos un registro para eliminar.");
+                    return;
+                }
+
+                var confirmMessage = "Estás a punto de eliminar " + selectedIds.length + " registros. ¿Deseas continuar?";
+                if (confirm(confirmMessage)) {
+                    $.ajax({
+                        url: '/eliminar_registros',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ 'selectedIds': selectedIds }),
+                        success: function (response) {
+                            location.reload();
+                        },
+                        error: function (xhr, status, error) {
+                            console.error("Error al eliminar registros:", error);
+                        }
+                    });
+                }
+            });
+
+            // Filter rows based on input fields
+            function filterRows() {
+                var nameSearchTerm = $("#searchName").val().toLowerCase();
+                var plazaSearchTerm = $("#searchPlaza").val().toLowerCase();
+                var localidadSearchTerm = $("#searchLocalidad").val().toLowerCase();
+                var tierSearchTerm = $("#searchTier").val();
+                var suerteSearchTerm = $("#searchSuerte").val();
+
+                $("tbody tr").each(function () {
+                    var infoText = $(this).find("td:eq(2)").text().toLowerCase();
+                    var tier = $(this).find("td:eq(2)").text().match(/tier:\s*(\d+)/i);
+                    var suerte = $(this).find("td:eq(2)").text().match(/suerte:\s*(\d+)/i);
+
+                    var nameMatch = infoText.includes("nombre: " + nameSearchTerm);
+                    var plazaMatch = infoText.includes("plaza de demanda: " + plazaSearchTerm);
+                    var localidadMatch = infoText.includes("localidad: " + localidadSearchTerm);
+                    var tierMatch = tierSearchTerm === "" || (tier && tier[1] === tierSearchTerm);
+                    var suerteMatch = suerteSearchTerm === "" || (suerte && parseInt(suerte[1]) >= parseInt(suerteSearchTerm));
+
+                    if (nameMatch && plazaMatch && localidadMatch && tierMatch && suerteMatch) {
+                        $(this).show();
+                    } else {
+                        $(this).hide();
+                    }
+                });
+            }
+
+            $("#searchName, #searchPlaza, #searchLocalidad, #searchTier, #searchSuerte").on("input", function () {
+                $("#selectAll").prop('checked', false);
+                $("#selectedIds").val("");
+                $(".recordCheckbox").prop('checked', false);
+                //filterRows();
+            });
+
+            //filterRows();
+            $(".editButton").click(function () {
+                editMode = "individual";
+                currentEditingId = $(this).data('id');
+                showModal();
+                // Cargar datos del despacho si es necesario
+            });
+
+
+
+            // Close modal when clicking outside of it or on the close button
+            window.onclick = function (event) {
+                var modal = document.getElementById('editModal');
+                if (event.target == modal || event.target.className == 'close') {
+                    hideModal();
+                }
+            }
+
+            // Save changes for a single record
+            $("#saveChanges").click(function () {
+                if (currentEditingId === null) {
+                    console.error("No se ha seleccionado ningún despacho para editar");
+                    return;
+                }
+                var formData = {
+                    id: currentEditingId,
+                    viaticos: $("#toggleEditViaticos").is(":checked") ? $("#editViaticos").is(":checked") : undefined,
+                    tier: $("#toggleEditTier").is(":checked") ? $("#editTier").val() : undefined,
+                    suerte: $("#toggleEditSuerte").is(":checked") ? $("#editSuerte").val() : undefined,
+                    corresponsabilidad: $("#toggleEditCorresponsabilidad").is(":checked") ? $("#editCorresponsabilidad").is(":checked") : undefined,
+                    prioridad: $("#toggleEditPrioridad").is(":checked") ? $("#editPrioridad").val() : undefined,
+                    asignable: $("#toggleEditAsignable").is(":checked") ? $("#editAsignable").is(":checked") : undefined
+                };
+
+                $.ajax({
+                    url: '/ruta_para_actualizar_despacho',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(formData),
+                    success: function (response) {
+                        hideModal();
+                        location.reload();
+                    },
+                    error: function (xhr, status, error) {
+                        console.error("Error en actualización:", error);
+                    }
+                });
+            });
+
+            // Toggle field editability
+            function toggleFieldEdit(toggleCheckboxId, fieldId) {
+                $('#' + toggleCheckboxId).change(function () {
+                    $('#' + fieldId).prop('disabled', !$(this).is(':checked'));
+                });
+            }
+
+            // Initialize toggles for each field
+            toggleFieldEdit('toggleEditViaticos', 'editViaticos');
+            toggleFieldEdit('toggleEditTier', 'editTier');
+            toggleFieldEdit('toggleEditSuerte', 'editSuerte');
+            toggleFieldEdit('toggleEditCorresponsabilidad', 'editCorresponsabilidad');
+            toggleFieldEdit('toggleEditPrioridad', 'editPrioridad');
+            toggleFieldEdit('toggleEditAsignable', 'editAsignable');
+
+            // Open the bulk edit modal for selected items
+            $('#bulkEditSelected').click(function () {
+                editMode = "bulk";
+                var selectedIds = $(".recordCheckbox:checked").map(function () {
+                    return $(this).val();
+                }).get();
+
+                if (selectedIds.length === 0) {
+                    alert("Por favor, selecciona al menos un registro para editar.");
+                    return;
+                }
+                /// buscando cambios
+                showModal();
+                $('#editModal').data('selectedIds', selectedIds);
+            });
+
+            $("#saveChanges").click(function () {
+        // Determinar si se está realizando una edición en masa
+        var selectedIds = $('#editModal').data('selectedIds');
+        if (selectedIds) {
+            // Lógica para edición en masa
+            var dataToSend = {
+                selectedIds: selectedIds,
+                viaticos: $("#toggleEditViaticos").is(":checked") ? $("#editViaticos").is(":checked") : undefined,
+                tier: $("#toggleEditTier").is(":checked") ? $("#editTier").val() : undefined,
+                suerte: $("#toggleEditSuerte").is(":checked") ? $("#editSuerte").val() : undefined,
+                corresponsabilidad: $("#toggleEditCorresponsabilidad").is(":checked") ? $("#editCorresponsabilidad").is(":checked") : undefined,
+                prioridad: $("#toggleEditPrioridad").is(":checked") ? $("#editPrioridad").val() : undefined,
+                asignable: $("#toggleEditAsignable").is(":checked") ? $("#editAsignable").is(":checked") : undefined
+            };
+
+            $.ajax({
+                url: '/bulk_edit_directorio',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(dataToSend),
+                success: function (response) {
+                    alert('Registros actualizados con éxito');
+                    location.reload();
+                },
+                error: function (xhr, status, error) {
+                    alert('Error al actualizar registros');
+                }
+            });
+        } else if (currentEditingId !== null) {
+            // Lógica para edición individual
+            var formData = {
+                id: currentEditingId,
+                viaticos: $("#toggleEditViaticos").is(":checked") ? $("#editViaticos").is(":checked") : undefined,
+                tier: $("#toggleEditTier").is(":checked") ? $("#editTier").val() : undefined,
+                suerte: $("#toggleEditSuerte").is(":checked") ? $("#editSuerte").val() : undefined,
+                corresponsabilidad: $("#toggleEditCorresponsabilidad").is(":checked") ? $("#editCorresponsabilidad").is(":checked") : undefined,
+                prioridad: $("#toggleEditPrioridad").is(":checked") ? $("#editPrioridad").val() : undefined,
+                asignable: $("#toggleEditAsignable").is(":checked") ? $("#editAsignable").is(":checked") : undefined
+            };
+
+            $.ajax({
+                url: '/ruta_para_actualizar_despacho',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function (response) {
+                    alert('Despacho actualizado con éxito');
+                    location.reload();
+                },
+                error: function (xhr, status, error) {
+                    console.error("Error en actualización:", error);
+                }
+            });
+        } else {
+            console.error("No se ha seleccionado ningún despacho para editar");
+        }
+    });
+        });
+
+    </script>
+
+    </style>
+</body>
+
+</html>
+{% endblock %}
